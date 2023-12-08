@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::custom_error::AocError;
 
 #[tracing::instrument]
@@ -6,7 +8,6 @@ pub fn process(input: &str) -> miette::Result<String, AocError> {
         .lines()
         .flat_map(|line| {
             let (first, second) = process_line(line);
-            eprintln!("{} => ({}, {})", line, first, second);
             format!("{}{}", first, second).parse::<u32>()
         })
         .sum::<u32>()
@@ -20,66 +21,25 @@ fn process_line(line: &str) -> (usize, usize) {
 
     let line = line.to_string();
 
-    let mut found_nums = vec![];
-
-    // start to end
-    let mut index = 0;
-    'root: while index < line.len() {
-        if let Ok(digit) = line[index..index + 1].parse() {
-            if digit <= 9 && digit >= 1 {
-                found_nums.push(digit);
-                break;
-            }
-        }
-
-        for i in 3..=5 {
-            let range = index..index + i;
-            if range.end >= line.len() {
-                continue;
-            }
-
-            let slice = &line[range.clone()].to_owned();
-            for (num, pattern) in PATTERNS.iter().enumerate() {
-                if &slice == pattern {
-                    found_nums.push(num);
-                    break 'root;
-                }
-            }
-        }
-
-        index += 1;
-    }
-
-    // end to start
-    let mut index = line.len();
-    'root: while index > 0 {
-        if let Ok(digit) = line[index - 1..index].parse() {
-            if digit <= 9 && digit >= 1 {
-                found_nums.push(digit);
-                break 'root;
-            }
-        }
-
-        for i in 3..=5 {
-            let range = index.saturating_sub(i)..index;
-            if range.start < 1 {
-                continue;
-            }
-
-            let slice = &line[range.clone()].to_owned();
-            for (num, pattern) in PATTERNS.iter().enumerate() {
-                if &slice == pattern {
-                    found_nums.push(num);
-                    break 'root;
-                }
-            }
-        }
-
-        index -= 1;
-    }
+    let found_nums = (0..line.len())
+        .filter_map(|i| {
+            let slice = &line[i..];
+            slice
+                .chars()
+                .next()
+                .and_then(|c| c.to_digit(10).map(|n| n as usize))
+                .or_else(|| {
+                    PATTERNS
+                        .iter()
+                        .enumerate()
+                        .find(|(_, pattern)| slice.starts_with(*pattern))
+                        .map(|(num, _)| num)
+                })
+        })
+        .collect_vec();
 
     let first = found_nums.first().expect("at least 1 digit to be present");
-    let second = found_nums.get(1).unwrap_or(first);
+    let second = found_nums.last().unwrap_or(first);
 
     (*first, *second)
 }
